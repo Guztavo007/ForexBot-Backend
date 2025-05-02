@@ -29,3 +29,11 @@ async def update_settings(request: Request):
 @app.get("/settings")
 def get_settings():
     return load_settings()
+
+@app.get("/logs")
+def get_logs():
+    log_path = Path("logs.json")
+    if log_path.exists():
+        with open(log_path) as f:
+            return json.load(f)
+    return []
