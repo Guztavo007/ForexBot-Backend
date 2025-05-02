@@ -1,10 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from strategy import run_strategy
 from db import init_db, get_all_trades
 from models import Trade
-from fastapi.middleware.cors import CORSMiddleware
-from daily_summary import get_daily_summary
-from datetime import datetime, timedelta
+from settings import load_settings, save_settings
 
 app = FastAPI()
 
@@ -26,7 +25,12 @@ def run_bot():
 def get_trades():
     return get_all_trades()
 
-@app.get("/summary")
-def summary():
-    since = datetime.utcnow() - timedelta(days=1)
-    return get_daily_summary(since)
+@app.get("/settings")
+def get_settings():
+    return load_settings()
+
+@app.post("/settings")
+async def update_settings(request: Request):
+    body = await request.json()
+    save_settings(body)
+    return {"message": "Settings updated"}
