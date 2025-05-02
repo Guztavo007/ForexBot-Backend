@@ -1,14 +1,18 @@
 import requests
+import os
 
-WEBHOOK_URL = "https://discord.com/api/webhooks/1367633654087684118/fBKIgzAcYf11CnHcLvsPwXJfCADZKHwk9S5rx8em02bAI94cQsncwbobhgLeA2NACh9t"
+DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 
-def send_discord_alert(message):
-    data = {"content": message}
+def send_alert(trade):
+    if not DISCORD_WEBHOOK_URL:
+        return
+
+    message = f"**{trade['action']} {trade['symbol']}** at {trade.get('price', 'market')}"
+
+    payload = {"content": message}
+    headers = {"Content-Type": "application/json"}
+
     try:
-        requests.post(WEBHOOK_URL, json=data)
+        requests.post(DISCORD_WEBHOOK_URL, json=payload, headers=headers)
     except Exception as e:
-        print("Discord alert failed:", e)
-
-def send_error_alert(error):
-    message = f"⚠️ **Forex Bot Error**: {error}"
-    send_discord_alert(message)
+        print("Failed to send Discord alert:", e)
