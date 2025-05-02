@@ -55,12 +55,14 @@ def run_strategy():
         if action != "hold":
             order = place_order(SYMBOL, action, trade_units)
             trade = log_trade(SYMBOL, action, price)
-            send_discord_alert(f"Trade Executed: {action.upper()} {SYMBOL} at {price:.5f}\nStrategy: {strategy}, RSI: {rsi:.2f}, SMA: {sma_short:.5f}/{sma_long:.5f}")
+            send_discord_alert(
+                f"Trade Executed: {action.upper()} {SYMBOL} at {price:.5f}\n"
+                f"Strategy: {str(strategy)}, RSI: {rsi:.2f}, SMA: {sma_short:.5f}/{sma_long:.5f}"
+            )
             return trade
 
-        return {{"symbol": SYMBOL, "action": action, "price": price, "rsi": rsi, "sma_short": sma_short, "sma_long": sma_long}}
+        return {"symbol": SYMBOL, "action": action, "price": price, "rsi": rsi, "sma_short": sma_short, "sma_long": sma_long}
 
     except Exception as e:
-        send_error_alert(str(e))
+        send_error_alert(f"Bot Error: {str(e)}")
         return {"status": "error", "detail": str(e)}
-
