@@ -1,9 +1,10 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from strategy import run_strategy
 from settings import load_settings, save_settings
 import json
 from pathlib import Path
+from datetime import datetime
 
 app = FastAPI()
 app.add_middleware(
@@ -31,9 +32,27 @@ def get_settings():
     return load_settings()
 
 @app.get("/logs")
-def get_logs():
+def get_logs(
+    symbol: str = Query(None),
+    action: str = Query(None),
+    since: str = Query(None)
+):
     log_path = Path("logs.json")
-    if log_path.exists():
-        with open(log_path) as f:
-            return json.load(f)
-    return []
+    if not log_path.exists():
+        return []
+
+    with open(log_path) as f:
+        logs = json.load(f)
+
+    if symbol:
+        logs = [log for log in logs if log.get("symbol") == symbol]
+    if action:
+        logs = [log for log in logs if log.get("action") == action]
+    if since:
+        try:
+            since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+            logs = [log for log in logs if datetime.fromisoformat(log["timestamp"].replace("Z", "+00:00")) >= since_dt]
+        except Exception as e:
+            return {"error": f"Invalid 'since' format: {str(e)}"}
+
+    return logs
