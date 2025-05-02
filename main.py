@@ -1,12 +1,11 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from strategy import run_strategy
-from db import init_db, get_all_trades
-from models import Trade
 from settings import load_settings, save_settings
+import json
+from pathlib import Path
 
 app = FastAPI()
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,23 +13,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-init_db()
-
 @app.post("/run")
-def run_bot():
-    trade = run_strategy()
+async def run_bot(request: Request):
+    body = await request.json()
+    symbol = body.get("symbol", "EUR_USD")
+    trade = run_strategy(symbol)
     return {"status": "executed", "trade": trade}
 
-@app.get("/trades", response_model=list[Trade])
-def get_trades():
-    return get_all_trades()
+@app.post("/settings")
+async def update_settings(request: Request):
+    data = await request.json()
+    save_settings(data)
+    return {"message": "Settings updated"}
 
 @app.get("/settings")
 def get_settings():
     return load_settings()
-
-@app.post("/settings")
-async def update_settings(request: Request):
-    body = await request.json()
-    save_settings(body)
-    return {"message": "Settings updated"}
