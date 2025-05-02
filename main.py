@@ -1,67 +1,69 @@
-from fastapi import FastAPI, Request, Query
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from pydantic import BaseModel
 from strategy import run_strategy
-from settings import load_settings, save_settings
-from oanda_account import get_account_summary
+from logger import log_decision
+from trade_executor import execute_trade
+from settings import save_settings, load_settings
+from performance import get_performance
 import json
 from pathlib import Path
 from datetime import datetime
 
 app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+class RunRequest(BaseModel):
+    symbol: str
+
+class SettingsRequest(BaseModel):
+    risk_level: int
+    strategy: str
+
 @app.post("/run")
-async def run_bot(request: Request):
-    try:
-        body = await request.json()
-    except:
-        body = {}
-    symbol = body.get("symbol", "EUR_USD")
-    trade = run_strategy(symbol)
-    return {"status": "executed", "trade": trade}
+def run_bot(req: RunRequest):
+    result = run_strategy(req.symbol)
+    log_decision(result)
+    executed_trade = execute_trade(result)
+    return {"trade": executed_trade}
 
 @app.post("/settings")
-async def update_settings(request: Request):
-    data = await request.json()
-    save_settings(data)
-    return {"message": "Settings updated"}
+def update_settings(settings: SettingsRequest):
+    save_settings(settings.dict())
+    return {"status": "success"}
 
 @app.get("/settings")
 def get_settings():
     return load_settings()
 
-@app.get("/account-summary")
-def account_summary():
-    return get_account_summary()
+@app.get("/trades")
+def get_trades():
+    path = Path("trades.json")
+    if not path.exists():
+        return []
+    with open(path) as f:
+        return json.load(f)
 
 @app.get("/logs")
-def get_logs(symbol: str = Query(None), action: str = Query(None), since: str = Query(None)):
-    log_path = Path("logs.json")
-    if not log_path.exists():
+def get_logs():
+    path = Path("logs.json")
+    if not path.exists():
         return []
-    with open(log_path) as f:
-        logs = json.load(f)
-    if symbol:
-        logs = [log for log in logs if log.get("symbol") == symbol]
-    if action:
-        logs = [log for log in logs if log.get("action") == action]
-    if since:
-        try:
-            since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
-            logs = [log for log in logs if datetime.fromisoformat(log["timestamp"].replace("Z", "+00:00")) >= since_dt]
-        except Exception as e:
-            return {"error": f"Invalid 'since' format: {str(e)}"}
-    return logs
+    with open(path) as f:
+        return json.load(f)
 
-@app.get("/logs/download")
-def download_logs():
-    log_file = Path("logs.json")
-    if log_file.exists():
-        return FileResponse(log_file, media_type="application/json", filename="logs.json")
-    return {"error": "No log file found."}
+@app.get("/account-summary")
+def get_account_summary():
+    from oanda_account import get_summary
+    return get_summary()
+
+@app.get("/performance")
+def performance():
+    return get_performance()
