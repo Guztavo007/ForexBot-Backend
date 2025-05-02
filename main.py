@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from strategy import run_strategy
@@ -6,9 +6,10 @@ from logger import log_decision
 from trade_executor import execute_trade
 from settings import save_settings, load_settings
 from performance import get_performance
+from oanda_account import get_summary
+from discord_alerts import send_alert
 import json
 from pathlib import Path
-from datetime import datetime
 
 app = FastAPI()
 
@@ -22,6 +23,7 @@ app.add_middleware(
 
 class RunRequest(BaseModel):
     symbol: str
+    alerts: dict = {}
 
 class SettingsRequest(BaseModel):
     risk_level: int
@@ -32,6 +34,16 @@ def run_bot(req: RunRequest):
     result = run_strategy(req.symbol)
     log_decision(result)
     executed_trade = execute_trade(result)
+
+    # Send Discord alert based on user preferences
+    if req.alerts.get("enabled"):
+        if result["action"].lower() in ["buy", "sell"] and req.alerts.get("trades"):
+            send_alert(result)
+        elif result["action"].lower() == "hold" and req.alerts.get("holds"):
+            send_alert(result)
+        elif result["action"].lower() == "error" and req.alerts.get("errors"):
+            send_alert(result)
+
     return {"trade": executed_trade}
 
 @app.post("/settings")
@@ -61,7 +73,6 @@ def get_logs():
 
 @app.get("/account-summary")
 def get_account_summary():
-    from oanda_account import get_summary
     return get_summary()
 
 @app.get("/performance")
