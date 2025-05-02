@@ -1,80 +1,29 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from fastapi import FastAPI, Request
 from strategy import run_strategy
 from logger import log_decision
-from trade_executor import execute_trade
-from settings import save_settings, load_settings
-from performance import get_performance
-from oanda_account import get_summary
 from discord_alerts import send_alert
-import json
-from pathlib import Path
+import uvicorn
 
 app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-class RunRequest(BaseModel):
-    symbol: str
-    alerts: dict = {}
-
-class SettingsRequest(BaseModel):
-    risk_level: int
-    strategy: str
-
 @app.post("/run")
-def run_bot(req: RunRequest):
-    result = run_strategy(req.symbol)
-    log_decision(result)
-    executed_trade = execute_trade(result)
+async def run_bot(request: Request):
+    body = await request.json()
+    symbol = body.get("symbol", "EUR_USD")
+    alerts = body.get("alerts", {})
+    try:
+        trade = run_strategy(symbol)
+        log_decision(trade)
+        if alerts.get("enabled"):
+            if trade["action"] in ["BUY", "SELL"] and alerts.get("trades"):
+                send_alert(trade)
+            elif trade["action"] == "HOLD" and alerts.get("holds"):
+                send_alert(trade)
+            elif trade["action"] == "ERROR" and alerts.get("errors"):
+                send_alert(trade)
+        return {"status": "success", "trade": trade}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
 
-    # Send Discord alert based on user preferences
-    if req.alerts.get("enabled"):
-        if result["action"].lower() in ["buy", "sell"] and req.alerts.get("trades"):
-            send_alert(result)
-        elif result["action"].lower() == "hold" and req.alerts.get("holds"):
-            send_alert(result)
-        elif result["action"].lower() == "error" and req.alerts.get("errors"):
-            send_alert(result)
-
-    return {"trade": executed_trade}
-
-@app.post("/settings")
-def update_settings(settings: SettingsRequest):
-    save_settings(settings.dict())
-    return {"status": "success"}
-
-@app.get("/settings")
-def get_settings():
-    return load_settings()
-
-@app.get("/trades")
-def get_trades():
-    path = Path("trades.json")
-    if not path.exists():
-        return []
-    with open(path) as f:
-        return json.load(f)
-
-@app.get("/logs")
-def get_logs():
-    path = Path("logs.json")
-    if not path.exists():
-        return []
-    with open(path) as f:
-        return json.load(f)
-
-@app.get("/account-summary")
-def get_account_summary():
-    return get_summary()
-
-@app.get("/performance")
-def performance():
-    return get_performance()
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=10000)
