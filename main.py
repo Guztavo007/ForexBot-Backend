@@ -16,7 +16,10 @@ app.add_middleware(
 
 @app.post("/run")
 async def run_bot(request: Request):
-    body = await request.json()
+    try:
+        body = await request.json()
+    except:
+        body = {}
     symbol = body.get("symbol", "EUR_USD")
     trade = run_strategy(symbol)
     return {"status": "executed", "trade": trade}
