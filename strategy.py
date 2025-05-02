@@ -62,4 +62,5 @@ def run_strategy():
 
     except Exception as e:
         send_error_alert(str(e))
-        return {{"status": "error", "detail": str(e)}}
+        return {"status": "error", "detail": str(e)}
+
