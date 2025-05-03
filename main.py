@@ -1,9 +1,11 @@
 
 from fastapi import FastAPI, Request
+from discord_test_patch import router as test_router
 from fastapi.middleware.cors import CORSMiddleware
 import json
 
 app = FastAPI()
+app.include_router(test_router)
 
 # Enable CORS for all origins
 app.add_middleware(
