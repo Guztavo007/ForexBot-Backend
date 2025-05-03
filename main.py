@@ -1,29 +1,25 @@
+
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-from trading_logic import trade  # assuming your strategy logic is in trading_logic.py
-from logger import log_decision  # assuming this is your custom logging module
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.post("/run")
 async def run_bot(request: Request):
     try:
         body = await request.json()
+        print("Received payload:", body)  # Debug print
+        symbol = body.get("symbol")
         alerts = body.get("alerts", {})
-        symbol = body.get("symbol", "EUR_USD")  # fallback to EUR_USD
-
-        print(f"⚙️ Running bot for {symbol} with alerts: {alerts}")
-        result = trade(symbol, alerts)
-        print("📤 Trade result:", result)
-
-        # Ensure logging is always called
-        log_decision({
-            "symbol": symbol,
-            "action": result.get("action", "none"),
-            "details": result
-        })
-
-        return JSONResponse(content={"status": "success", "trade": result})
+        return {"status": "received", "symbol": symbol, "alerts": alerts}
     except Exception as e:
-        print("🔥 Exception in /run:", str(e))
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        print("Error in /run:", str(e))
+        return {"error": str(e)}
