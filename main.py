@@ -1,33 +1,18 @@
 
 from fastapi import FastAPI, Request
-from discord_test_patch import router as test_router
-from fastapi.middleware.cors import CORSMiddleware
-import json
+from fastapi.responses import JSONResponse
+from trade_executor import execute_trade
 
 app = FastAPI()
-app.include_router(test_router)
-
-# Enable CORS for all origins
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 @app.post("/run")
 async def run_bot(request: Request):
     try:
         body = await request.json()
-        symbol = body.get("symbol", "EUR_USD")
-        alerts = body.get("alerts", {})
-        print(f"Executing bot for {symbol} with alerts: {alerts}")
-        return {"status": "success", "action": "hold"}
-    except Exception as e:
-        print(f"Error in /run: {e}")
-        return {"status": "error", "message": str(e)}
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Invalid or missing JSON body."})
 
-@app.get("/logs")
-def get_logs():
-    return {"logs": ["Bot started", "Decision: HOLD", "No action taken"]}
+    symbol = body.get("symbol", "EUR_USD")
+    alerts = body.get("alerts", {})
+    result = execute_trade(symbol, alerts)
+    return {"result": result}
