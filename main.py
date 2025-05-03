@@ -1,30 +1,29 @@
-
 from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-import json
-import os
+from fastapi.responses import JSONResponse
+from trading_logic import trade  # assuming your strategy logic is in trading_logic.py
+from logger import log_decision  # assuming this is your custom logging module
 
 app = FastAPI()
 
-# Enable CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # You can replace "*" with your frontend URL for more security
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 @app.post("/run")
 async def run_bot(request: Request):
-    body = await request.json()
-    symbol = body.get("symbol", "EUR_USD")
-    alerts = body.get("alerts", {})
-    return {"status": "executed", "symbol": symbol, "alerts": alerts}
+    try:
+        body = await request.json()
+        alerts = body.get("alerts", {})
+        symbol = body.get("symbol", "EUR_USD")  # fallback to EUR_USD
 
-@app.get("/test-discord")
-def test_discord():
-    webhook_url = os.getenv("Discord_Webhook_URL")
-    if not webhook_url:
-        return {"error": "Webhook URL not set"}
-    return {"status": "Webhook URL is set"}
+        print(f"⚙️ Running bot for {symbol} with alerts: {alerts}")
+        result = trade(symbol, alerts)
+        print("📤 Trade result:", result)
+
+        # Ensure logging is always called
+        log_decision({
+            "symbol": symbol,
+            "action": result.get("action", "none"),
+            "details": result
+        })
+
+        return JSONResponse(content={"status": "success", "trade": result})
+    except Exception as e:
+        print("🔥 Exception in /run:", str(e))
+        return JSONResponse(content={"error": str(e)}, status_code=500)
