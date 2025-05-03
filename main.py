@@ -2,8 +2,10 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from trade_executor import execute_trade
+from logs import router as logs_router
 
 app = FastAPI()
+app.include_router(logs_router)
 
 @app.post("/run")
 async def run_bot(request: Request):
