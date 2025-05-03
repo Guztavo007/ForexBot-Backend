@@ -22,10 +22,13 @@ def sma_rsi_strategy(data, risk_level):
 
     sma_short = np.mean(close_prices[-5:])
     sma_long = np.mean(close_prices[-15:])
+
     delta = np.diff(close_prices)
-    gain = np.mean([d for d in delta[-14:] if d > 0] or [0])
-    loss = -np.mean([d for d in delta[-14:] if d < 0] or [0])
-    rs = gain / loss if loss != 0 else float('inf')
+    gains = np.where(delta > 0, delta, 0)
+    losses = np.where(delta < 0, -delta, 0)
+    avg_gain = np.mean(gains[-14:])
+    avg_loss = np.mean(losses[-14:])
+    rs = avg_gain / avg_loss if avg_loss != 0 else float("inf")
     rsi = 100 - (100 / (1 + rs))
 
     if sma_short > sma_long and rsi < 70:
@@ -35,19 +38,26 @@ def sma_rsi_strategy(data, risk_level):
     else:
         return {"action": "HOLD", "reason": f"SMA and RSI neutral ({rsi:.2f})"}
 
+def ema(series, period):
+    weights = np.exp(np.linspace(-1., 0., period))
+    weights /= weights.sum()
+    a = np.convolve(series, weights, mode='full')[:len(series)]
+    a[:period] = a[period]
+    return a
+
 def macd_strategy(data, risk_level):
     close = np.array(data["close"])
     if len(close) < 35:
         return {"action": "HOLD", "reason": "Not enough data for MACD"}
 
-    ema12 = np.convolve(close[-35:], np.ones(12)/12, mode='valid')[-1]
-    ema26 = np.convolve(close[-35:], np.ones(26)/26, mode='valid')[-1]
-    macd = ema12 - ema26
-    signal = np.convolve(close[-35:], np.ones(9)/9, mode='valid')[-1]
+    ema12 = ema(close, 12)
+    ema26 = ema(close, 26)
+    macd_line = ema12[-1] - ema26[-1]
+    signal_line = ema(macd_line if isinstance(macd_line, np.ndarray) else np.array([macd_line]), 9)[-1]
 
-    if macd > signal:
+    if macd_line > signal_line:
         return {"action": "BUY", "reason": "MACD crossover"}
-    elif macd < signal:
+    elif macd_line < signal_line:
         return {"action": "SELL", "reason": "MACD crossdown"}
     else:
         return {"action": "HOLD", "reason": "MACD neutral"}
