@@ -1,6 +1,22 @@
-import datetime
+import logging
+import json
+from datetime import datetime
 
-def log_decision(trade):
-    timestamp = datetime.datetime.utcnow().isoformat()
-    with open("trade_logs.txt", "a") as f:
-        f.write(f"[{timestamp}] {trade['symbol']} | Action: {trade['action']} | Reason: {trade.get('reason', 'N/A')} | Indicators: {trade.get('indicators', {})}\n")
+logger = logging.getLogger("forex_bot")
+logger.setLevel(logging.INFO)
+handler = logging.FileHandler("bot.log")
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
+def log_decision(symbol, strategy, decision, price, indicators, executed):
+    log_entry = {
+        "symbol": symbol,
+        "strategy": strategy,
+        "decision": decision,
+        "price": price,
+        "indicators": indicators,
+        "executed": executed,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+    logger.info(json.dumps(log_entry))
